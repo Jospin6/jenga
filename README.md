@@ -1,115 +1,340 @@
-# Jenga — générateur de sites avec aperçu en direct
+# Jenga
 
-Interface Next.js reliée à l’agent LangGraph existant : prompt → planificateur → architecte → codeur. L’API FastAPI diffuse les étapes et le contenu des fichiers en SSE. L’interface affiche la conversation, le code et un aperçu qui se met à jour pendant la création.
+Jenga is an AI-powered website generator with live preview.
 
-## Démarrer en local
+Describe the website you want to build, and Jenga plans the structure, writes the files, and updates the preview while the project is being generated.
 
-Prérequis : Python 3.11+ et Node.js 20.9+.
+It uses:
 
-Depuis la racine du dépôt, dans un premier terminal PowerShell :
+- **Next.js** for the frontend
+- **FastAPI** for the backend API
+- **LangGraph** to orchestrate the AI agents
+- **Server-Sent Events (SSE)** for real-time generation updates
+
+## Preview
+
+### Homepage
+
+![Jenga homepage](./screenshots/home.png)
+
+### Website generation
+
+![Jenga website generation](./screenshots/generation.png)
+
+## Features
+
+- Generate websites from a simple prompt
+- Live preview while files are being created
+- Switch between **Preview** and **Code**
+- Desktop and mobile preview modes
+- Continue editing an existing project through conversation
+- Stop an active generation
+- Reopen recent projects
+- Download generated files as a ZIP archive
+- Keep the conversation and project files together
+
+Generated websites currently use standard **HTML, CSS, and JavaScript**, which makes it possible to preview them immediately without starting another development server.
+
+## Getting Started
+
+### Requirements
+
+- Python 3.11+
+- Node.js 20.9+
+
+Clone the repository and install the backend dependencies.
+
+On Windows PowerShell:
 
 ```powershell
-# Si l’environnement Python n’existe pas encore :
 python -m venv backend/.venv
+
 backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
+```
 
-# Seulement si backend/.env n’existe pas encore :
+If `backend/.env` does not exist yet:
+
+```powershell
 Copy-Item backend/.env.example backend/.env
-# Renseigner OPENAI_API_KEY dans backend/.env.
+```
 
+Add your OpenAI API key:
+
+```env
+OPENAI_API_KEY=your_key_here
+```
+
+You can also change the model:
+
+```env
+OPENAI_MODEL=gpt-4o
+```
+
+Start the backend:
+
+```powershell
 backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Le fichier `backend/.env` existant est conservé. `OPENAI_MODEL` permet de changer le modèle (par défaut `gpt-4o`). La clé reste uniquement côté serveur. Sur macOS/Linux, utiliser `backend/.venv/bin/python` à la place de `backend/.venv/Scripts/python.exe`.
+On macOS or Linux, use:
 
-Dans un deuxième terminal :
+```bash
+backend/.venv/bin/python
+```
 
-```powershell
+## Frontend
+
+Open another terminal:
+
+```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-Ouvrir **http://localhost:3000**. L’API et sa documentation sont accessibles sur **http://127.0.0.1:8000/docs**.
+Then open:
 
-Le proxy Next.js utilise `http://127.0.0.1:8000` par défaut. Pour changer cette adresse, copier `frontend/.env.example` vers `frontend/.env.local` et modifier `BACKEND_URL`. Aucune variable publique ni configuration CORS n’est nécessaire : le navigateur appelle `/api` sur le même domaine que l’interface.
+```text
+http://localhost:3000
+```
 
-## Utilisation
+FastAPI documentation is available at:
 
-- Décrire un site, ou sélectionner une suggestion pour préremplir le prompt.
-- Suivre la planification, les fichiers en cours d’écriture et l’aperçu automatique.
-- Basculer entre Aperçu et Code, puis entre les vues ordinateur et mobile.
-- Arrêter une génération ; les fichiers déjà écrits sont conservés.
-- Demander des modifications dans la même conversation.
-- Télécharger les fichiers dans une archive ZIP, ou rouvrir un projet depuis la barre latérale.
+```text
+http://127.0.0.1:8000/docs
+```
 
-Les fichiers et la conversation sont sauvegardés dans `generated_projects/<uuid>/`. La liste des projets récents est conservée dans le stockage local du navigateur. Les générations précédentes de `generated_project/` ne sont pas modifiées ni importées automatiquement.
+## Configuration
 
-Sur Vercel (`VERCEL=1`), le backend utilise automatiquement `/tmp/jenga/generated_projects/`, car le dossier du déploiement est en lecture seule. `PROJECTS_DIR` permet de choisir un autre dossier accessible en écriture via les variables d’environnement du backend ; utiliser un chemin absolu puis redéployer après modification. En local, cette variable peut être placée dans `backend/.env`.
+By default, the Next.js frontend connects to:
 
-Le stockage `/tmp` est **temporaire et propre à chaque instance** : un projet peut disparaître au redémarrage ou être introuvable si la requête suivante arrive sur une autre instance, y compris pour une modification ou un téléchargement. Ce correctif permet la génération et son aperçu dans la requête en cours. La sauvegarde durable, la réouverture et l’export fiable des projets nécessitent un stockage externe partagé.
+```text
+http://127.0.0.1:8000
+```
 
-## Mémoire de conversation
+To use another backend URL, create:
 
-Le graphe LangGraph utilise une mémoire courte par projet (`thread_id = project_id`). Il conserve la demande initiale et les 12 messages récents, avec leurs rôles utilisateur/assistant. Chaque nouvelle demande reçoit aussi le plan précédent et des extraits limités des fichiers actuels ; le codeur peut lire les fichiers complets avec ses outils. Les étapes de travail sont réinitialisées à chaque tour pour exécuter réellement les modifications demandées.
+```text
+frontend/.env.local
+```
 
-Le contexte textuel de conversation est limité à 32 000 caractères et les extraits de fichiers à 24 000 caractères. L’historique complet reste sauvegardé dans le projet et réhydrate la mémoire lorsqu’il est rouvert ou que le processus redémarre. Les checkpoints `InMemorySaver` sont propres au processus : cette mémoire ne remplace pas un stockage partagé. Sur Vercel, la continuité entre instances reste conditionnée à la disponibilité des fichiers et de l’historique du projet (voir la limite du stockage `/tmp` ci-dessus).
+You can copy the example file:
 
-## Périmètre de cette version
+```bash
+cp frontend/.env.example frontend/.env.local
+```
 
-Le **frontend de l’outil est en Next.js**. Les **sites générés sont des sites statiques HTML/CSS/JavaScript**, avec `index.html` comme point d’entrée, des scripts classiques et une navigation sur une seule page. Cette contrainte est ajoutée aux prompts de l’agent pour garantir un aperçu immédiat sans installer ou exécuter du code serveur généré.
+Then configure:
 
-L’aperçu assemble les fichiers en mémoire dans une iframe isolée (`sandbox="allow-scripts"` et CSP). HTML et CSS apparaissent progressivement ; seuls les scripts enregistrés en entier sont exécutés. L’aperçu ne permet pas les appels réseau JavaScript, le stockage local, les cookies, les imports de modules ni l’exécution d’un backend. Les interactions en mémoire, les styles et les images HTTPS fonctionnent. Un aperçu de projets React/Next.js générés demanderait un environnement de compilation et d’exécution isolé supplémentaire.
+```env
+BACKEND_URL=http://127.0.0.1:8000
+```
 
-Il s’agit d’un outil local : pas d’authentification ni de contrôle d’accès entre comptes. Exécuter **un seul worker FastAPI** ; les verrous de génération sont en mémoire. Avant une mise en ligne partagée, ajouter comptes et autorisations, limites d’utilisation, verrous partagés et un stockage adapté. Une coupure du flux annule la génération ; il n’y a pas de reprise automatique des événements. Les fichiers déjà sauvegardés restent disponibles pour une nouvelle demande. La durée maximale d’une génération est de 15 minutes ; l’hébergement et les proxies doivent autoriser les connexions longues sans buffering.
+The OpenAI API key stays on the backend and is never exposed to the browser.
 
-## API et streaming
+## How It Works
 
-| Route | Rôle |
-| --- | --- |
-| `GET /api/health` | Disponibilité et présence de la configuration du modèle |
-| `POST /api/generate` | `{ "prompt": "…", "project_id": null }`, réponse SSE |
-| `GET /api/projects/{uuid}` | Métadonnées, conversation et fichiers sauvegardés |
-| `GET /api/projects/{uuid}/download` | Archive ZIP des fichiers |
+Jenga uses a multi-step agent workflow:
 
-Pour modifier un projet, envoyer son `project_id` avec le nouveau prompt. Le flux contient des trames `data: <JSON>\n\n`, plus des commentaires keepalive toutes les 15 secondes sans événement.
+```text
+Prompt
+  ↓
+Planner
+  ↓
+Architect
+  ↓
+Coder
+  ↓
+Generated Files
+  ↓
+Live Preview
+```
 
-| Événement | Contenu |
-| --- | --- |
-| `start` | `project_id` |
-| `stage` | Étape, message et fichier en cours |
-| `plan` | Plan structuré |
-| `tasks` | Liste ordonnée des tâches |
-| `file_delta` | `path`, `content` : contenu partiel **complet à remplacer**, pas un fragment à concaténer |
-| `file` | `path`, `content` : fichier effectivement sauvegardé |
-| `task_done` | Fichier terminé et progression |
-| `done` | Projet terminé et instantané des fichiers |
-| `error` | Erreur présentable à l’utilisateur, sans détails sensibles du fournisseur |
+The backend streams progress to the frontend using **Server-Sent Events**.
 
-Le proxy transmet le corps de la réponse sans le bufferiser. Le client décode les trames SSE même lorsqu’elles sont coupées au milieu d’un caractère UTF-8. `AbortController` propage l’arrêt au backend et aux appels asynchrones du graphe. Les flux `messages` et `custom` de [LangGraph](https://docs.langchain.com/oss/python/langgraph/streaming) servent respectivement aux brouillons et aux événements métier.
+This allows the interface to display generation stages, file updates, and the website preview before the full generation is complete.
 
-## Vérifications
+## Generated Projects
+
+In local development, generated projects are stored inside:
+
+```text
+generated_projects/<project_id>/
+```
+
+Each project keeps its generated files and conversation history.
+
+This makes it possible to reopen a project and ask Jenga to modify it instead of starting from scratch.
+
+## Deployment on Vercel
+
+When running on Vercel, the backend automatically uses:
+
+```text
+/tmp/jenga/generated_projects/
+```
+
+This storage is temporary.
+
+Projects may disappear when an instance restarts, and another request may be handled by a different instance.
+
+For production or multi-user deployments, use persistent shared storage.
+
+You can configure another writable directory with:
+
+```env
+PROJECTS_DIR=/absolute/path/to/projects
+```
+
+## API
+
+Main endpoints:
+
+| Route | Description |
+|---|---|
+| `GET /api/health` | Check API availability |
+| `POST /api/generate` | Start or continue a generation |
+| `GET /api/projects/{uuid}` | Load a saved project |
+| `GET /api/projects/{uuid}/download` | Download a project as ZIP |
+
+Example generation request:
+
+```json
+{
+  "prompt": "Create a modern landing page for a SaaS product",
+  "project_id": null
+}
+```
+
+To continue an existing project, send its `project_id` with the new prompt.
+
+## Streaming Events
+
+During generation, the API can emit events such as:
+
+- `start`
+- `stage`
+- `plan`
+- `tasks`
+- `file_delta`
+- `file`
+- `task_done`
+- `done`
+- `error`
+
+These events are used by the frontend to update the interface in real time.
+
+## Running Tests
+
+Backend:
 
 ```powershell
-# À la racine : tests de l’API et du véritable graphe, avec modèle simulé.
 backend/.venv/Scripts/python.exe -m unittest discover -s backend/tests -v
+```
 
+Frontend:
+
+```bash
 cd frontend
+
 npm run lint
 npm run build
+
 npx playwright install chromium
 npm run test:e2e
 ```
 
-Les tests navigateur démarrent un backend déterministe sur le port 8011 et Next.js sur le port 3100. Ils vérifient le streaming via le vrai proxy, l’aperçu avant la fin, les scripts/CSS, le code, l’export ZIP, les modifications, la restauration, les erreurs, l’annulation et l’interface mobile. Aucune requête payante au modèle n’est effectuée. Les fichiers de test et captures sont placés dans `.test-artifacts/`, ignoré par Git. `PLAYWRIGHT_CHROMIUM_EXECUTABLE` peut pointer vers une installation Chromium existante.
+The browser tests use a deterministic backend and do not make paid model requests.
 
-## Fichiers principaux
+## Project Structure
 
-- `backend/agent/graph.py` : étapes asynchrones de l’agent et contraintes d’aperçu.
-- `backend/agent/workspace.py` : contexte de fichiers isolé par génération.
-- `backend/main.py` : API, annulation, erreurs et keepalive SSE.
-- `backend/streaming.py` : extraction du code depuis les arguments d’outils streamés.
-- `frontend/app/api/[...path]/route.ts` : proxy serveur vers FastAPI.
-- `frontend/lib/use-builder.ts` : état de génération et projets récents.
-- `frontend/lib/preview.ts` : assemblage de l’aperçu isolé.
-- `frontend/components/builder.tsx` : interface de création.
+```text
+backend/
+├── agent/
+│   ├── graph.py
+│   └── workspace.py
+├── main.py
+└── streaming.py
+
+frontend/
+├── app/
+├── components/
+├── lib/
+└── public/
+
+screenshots/
+├── home.png
+└── generation.png
+```
+
+Main files:
+
+- `backend/agent/graph.py` — agent workflow
+- `backend/agent/workspace.py` — project file workspace
+- `backend/main.py` — FastAPI application
+- `backend/streaming.py` — streaming helpers
+- `frontend/components/builder.tsx` — main builder interface
+- `frontend/lib/use-builder.ts` — generation state
+- `frontend/lib/preview.ts` — isolated live preview
+- `frontend/app/api/[...path]/route.ts` — proxy to FastAPI
+
+## Current Limitations
+
+Jenga is currently designed mainly for local development.
+
+At the moment:
+
+- generated websites use HTML, CSS, and JavaScript
+- the preview cannot run a generated backend
+- Vercel `/tmp` storage is not persistent
+- authentication is not implemented yet
+- generation locks are stored in memory
+- generated React or Next.js projects are not executed directly
+
+Supporting generated React or Next.js applications will require an isolated environment capable of installing dependencies, building the project, and running a development server safely.
+
+## Contributing
+
+Contributions are welcome.
+
+To contribute:
+
+1. Fork the repository.
+2. Create a branch.
+
+```bash
+git checkout -b feature/my-feature
+```
+
+3. Make your changes.
+4. Add or update tests when necessary.
+5. Open a Pull Request.
+
+For bugs, feature requests, or ideas, feel free to open an Issue.
+
+## Roadmap
+
+Some ideas for future versions:
+
+- React and Next.js project generation
+- persistent project storage
+- authentication
+- cloud project management
+- project version history
+- improved agent tooling
+- one-click deployment
+- better preview environments
+
+## License
+
+Add the license used by the project here.
+
+For example:
+
+```text
+MIT License
+```
+
+---
+
+Built with Next.js, FastAPI, and LangGraph.
