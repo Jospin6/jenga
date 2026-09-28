@@ -5,8 +5,12 @@ import time
 
 from langchain_core.utils.json import parse_partial_json
 
-from backend.agent.tools import safe_path_for_project
-from backend.agent.workspace import project_root
+if __package__:
+    from .agent.tools import safe_path_for_project
+    from .agent.workspace import project_root
+else:
+    from agent.tools import safe_path_for_project
+    from agent.workspace import project_root
 
 
 def sse(event: dict) -> str:

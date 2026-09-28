@@ -12,9 +12,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
-from backend.projects import load_project, project_dir, read_files, save_project
-from backend.agent.workspace import project_workspace
-from backend.streaming import FileDrafts, sse
+if __package__:
+    from .projects import load_project, project_dir, read_files, save_project
+    from .agent.workspace import project_workspace
+    from .streaming import FileDrafts, sse
+else:
+    # Vercel loads main.py directly when its Root Directory is backend/.
+    from projects import load_project, project_dir, read_files, save_project
+    from agent.workspace import project_workspace
+    from streaming import FileDrafts, sse
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
 app = FastAPI(title="Jenga — Website builder", version="1.0.0")
@@ -23,7 +29,10 @@ active_projects: set[str] = set()
 
 
 def get_agent():
-    from backend.agent.graph import agent
+    if __package__:
+        from .agent.graph import agent
+    else:
+        from agent.graph import agent
     return agent
 
 
@@ -173,3 +182,8 @@ async def generate(body: GenerateRequest):
     return StreamingResponse(events(), media_type="text/event-stream", headers={
         "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no",
     })
+
+
+@app.get("/")
+def root():
+    return {"message": "Welcom to jenga api"}

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from langchain_core.tools import tool
-from backend.agent.workspace import emit, project_root
+from .workspace import emit, project_root
 
 def safe_read_file(path: str) -> str:
     """

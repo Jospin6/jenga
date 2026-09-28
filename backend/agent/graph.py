@@ -8,13 +8,13 @@ from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
-from backend.agent.prompts import architect_prompt, coder_system_prompt, planner_prompt
-from backend.agent.state import AgentState, CoderState, Plan, TaskPlan
-from backend.agent.tools import (
+from .prompts import architect_prompt, coder_system_prompt, planner_prompt
+from .state import AgentState, CoderState, Plan, TaskPlan
+from .tools import (
     get_current_directory, list_files, read_file, safe_path_for_project,
     safe_read_file, write_file,
 )
-from backend.agent.workspace import emit
+from .workspace import emit
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
