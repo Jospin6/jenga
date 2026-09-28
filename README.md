@@ -49,6 +49,12 @@ Sur Vercel (`VERCEL=1`), le backend utilise automatiquement `/tmp/jenga/generate
 
 Le stockage `/tmp` est **temporaire et propre à chaque instance** : un projet peut disparaître au redémarrage ou être introuvable si la requête suivante arrive sur une autre instance, y compris pour une modification ou un téléchargement. Ce correctif permet la génération et son aperçu dans la requête en cours. La sauvegarde durable, la réouverture et l’export fiable des projets nécessitent un stockage externe partagé.
 
+## Mémoire de conversation
+
+Le graphe LangGraph utilise une mémoire courte par projet (`thread_id = project_id`). Il conserve la demande initiale et les 12 messages récents, avec leurs rôles utilisateur/assistant. Chaque nouvelle demande reçoit aussi le plan précédent et des extraits limités des fichiers actuels ; le codeur peut lire les fichiers complets avec ses outils. Les étapes de travail sont réinitialisées à chaque tour pour exécuter réellement les modifications demandées.
+
+Le contexte textuel de conversation est limité à 32 000 caractères et les extraits de fichiers à 24 000 caractères. L’historique complet reste sauvegardé dans le projet et réhydrate la mémoire lorsqu’il est rouvert ou que le processus redémarre. Les checkpoints `InMemorySaver` sont propres au processus : cette mémoire ne remplace pas un stockage partagé. Sur Vercel, la continuité entre instances reste conditionnée à la disponibilité des fichiers et de l’historique du projet (voir la limite du stockage `/tmp` ci-dessus).
+
 ## Périmètre de cette version
 
 Le **frontend de l’outil est en Next.js**. Les **sites générés sont des sites statiques HTML/CSS/JavaScript**, avec `index.html` comme point d’entrée, des scripts classiques et une navigation sur une seule page. Cette contrainte est ajoutée aux prompts de l’agent pour garantir un aperçu immédiat sans installer ou exécuter du code serveur généré.

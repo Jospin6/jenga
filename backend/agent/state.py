@@ -1,4 +1,7 @@
-from typing import Literal, TypedDict
+from typing import Annotated, Literal, TypedDict
+
+from langchain_core.messages import AnyMessage
+from langgraph.graph.message import add_messages
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -73,8 +76,12 @@ class CoderState(BaseModel):
 
 class AgentState(TypedDict, total=False):
     user_prompt: str
+    messages: Annotated[list[AnyMessage], add_messages]
+    assistant_message_id: str
+    turn_context: str
+    previous_plan: dict | None
     browser_preview: bool
-    plan: Plan
-    task_plan: TaskPlan
-    coder_state: CoderState
-    status: Literal["CODING", "DONE"]
+    plan: Plan | None
+    task_plan: TaskPlan | None
+    coder_state: CoderState | None
+    status: Literal["PLANNING", "CODING", "DONE"]

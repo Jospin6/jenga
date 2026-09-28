@@ -18,11 +18,13 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 if __package__:
     from .projects import load_project, project_dir, read_files, save_project
     from .agent.workspace import project_workspace
+    from .agent.memory import COMPLETION_MESSAGE, messages_from_history
     from .streaming import FileDrafts, sse
 else:
     # Vercel loads main.py directly when its Root Directory is backend/.
     from projects import load_project, project_dir, read_files, save_project
     from agent.workspace import project_workspace
+    from agent.memory import COMPLETION_MESSAGE, messages_from_history
     from streaming import FileDrafts, sse
 
 app = FastAPI(title="Jenga — Website builder", version="1.0.0")
@@ -120,14 +122,16 @@ async def generate(body: GenerateRequest):
             try:
                 async with asyncio.timeout(900):
                     with project_workspace(project_dir(project_id) / "files"):
-                        existing = read_files(project_id)
-                        context = "\n".join(item["content"] for item in data["history"][-8:])
-                        if existing:
-                            context += "\nExisting project files (inspect them before edits):\n" + "\n".join(existing)
                         drafts = FileDrafts()
                         async for part in get_agent().astream(
-                            {"user_prompt": context, "browser_preview": True},
-                            {"recursion_limit": 100}, stream_mode=["custom", "messages"],
+                            {
+                                "user_prompt": body.prompt, "browser_preview": True,
+                                "messages": messages_from_history(data["history"], project_id),
+                                "assistant_message_id": f"{project_id}:{len(data['history'])}",
+                                "previous_plan": data.get("plan"),
+                            },
+                            {"recursion_limit": 100, "configurable": {"thread_id": project_id}},
+                            stream_mode=["custom", "messages"],
                             subgraphs=True, version="v2",
                         ):
                             if part["type"] == "custom":
@@ -144,7 +148,7 @@ async def generate(body: GenerateRequest):
                         if not files.get("index.html", "").strip():
                             raise ValueError("No preview entry point was generated.")
                         data["status"] = "completed"
-                        data["history"].append({"role": "assistant", "content": "Votre site est prêt. Vous pouvez le prévisualiser ou demander des modifications."})
+                        data["history"].append({"role": "assistant", "content": COMPLETION_MESSAGE})
                         await queue.put({"type": "done", "project_id": project_id, "files": files})
             except asyncio.CancelledError:
                 data["status"] = "cancelled"

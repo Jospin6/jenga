@@ -2,12 +2,18 @@ import asyncio
 import os
 from functools import lru_cache
 from pathlib import Path
+from uuid import uuid4
 
 from dotenv import load_dotenv
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
+from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.graph import END, StateGraph
+from langgraph.graph.message import REMOVE_ALL_MESSAGES
 
+from .memory import COMPLETION_MESSAGE, conversation_context, conversation_window, project_context
 from .prompts import architect_prompt, coder_system_prompt, planner_prompt
 from .state import AgentState, CoderState, Plan, TaskPlan
 from .tools import (
@@ -44,9 +50,41 @@ def get_llm():
     )
 
 
+def prepare_turn(state: AgentState) -> dict:
+    messages = list(state.get("messages", []))
+    prompt = state.get("user_prompt", "")
+    if prompt and (not messages or messages[-1].type != "human" or messages[-1].content != prompt):
+        messages.append(HumanMessage(content=prompt, id=str(uuid4())))
+    messages = conversation_window(messages)
+    context = (
+        "CONVERSATION (the latest user message is the current request):\n"
+        + conversation_context(messages)
+        + "\n\n" + project_context(state.get("previous_plan") or state.get("plan"))
+        + "\n\nFor modifications, preserve existing content, design and working features. "
+          "Change only what the latest request asks for. Existing file contents are "
+          "the current implementation; inspect full files with read_file when needed."
+    )
+    return {
+        "messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *messages],
+        "turn_context": context,
+        # Checkpoints retain conversation, but each request needs fresh work steps.
+        "plan": None, "task_plan": None, "coder_state": None, "status": "PLANNING",
+    }
+
+
+def remember_turn(state: AgentState) -> dict:
+    last_user = next(message for message in reversed(state["messages"]) if message.type == "human")
+    reply = AIMessage(
+        content=COMPLETION_MESSAGE,
+        id=state.get("assistant_message_id") or f"reply:{last_user.id}",
+    )
+    messages = conversation_window([*state["messages"], reply])
+    return {"messages": [RemoveMessage(id=REMOVE_ALL_MESSAGES), *messages]}
+
+
 async def planner_agent(state: AgentState) -> dict:
     emit({"type": "stage", "stage": "planning", "message": "Je prépare le plan de votre site."})
-    prompt = planner_prompt(state["user_prompt"])
+    prompt = planner_prompt(state["turn_context"])
     if state.get("browser_preview"):
         prompt += BROWSER_CONTRACT
     response = await get_llm().with_structured_output(Plan, method="json_schema").ainvoke(prompt)
@@ -63,7 +101,7 @@ async def planner_agent(state: AgentState) -> dict:
 
 async def architect_agent(state: AgentState) -> dict:
     emit({"type": "stage", "stage": "architecture", "message": "J’organise les pages et les fichiers."})
-    prompt = architect_prompt(state["plan"])
+    prompt = architect_prompt(state["plan"]) + "\n\n" + state["turn_context"]
     if state.get("browser_preview"):
         prompt += BROWSER_CONTRACT
     response = await get_llm().with_structured_output(TaskPlan, method="json_schema").ainvoke(prompt)
@@ -94,7 +132,7 @@ async def coder_agent(state: AgentState) -> dict:
     })
     user_prompt = f"""
         USER REQUEST AND PROJECT CONTEXT:
-        {state['user_prompt']}
+        {state['turn_context']}
 
         GLOBAL PROJECT PLAN:
         {state['plan'].model_dump_json(indent=2)}
@@ -130,18 +168,28 @@ async def coder_agent(state: AgentState) -> dict:
 
 
 graph = StateGraph(AgentState)
+graph.add_node("prepare", prepare_turn)
 graph.add_node("planner", planner_agent)
 graph.add_node("architect", architect_agent)
 graph.add_node("coder", coder_agent)
+graph.add_node("remember", remember_turn)
+graph.add_edge("prepare", "planner")
 graph.add_edge("planner", "architect")
 graph.add_edge("architect", "coder")
-graph.add_conditional_edges("coder", lambda state: END if state.get("status") == "DONE" else "coder")
-graph.set_entry_point("planner")
-agent = graph.compile()
+graph.add_conditional_edges("coder", lambda state: "remember" if state.get("status") == "DONE" else "coder")
+graph.add_edge("remember", END)
+graph.set_entry_point("prepare")
+def compile_agent():
+    # Explicitly permit our structured state in checkpoints, including strict mode.
+    serializer = JsonPlusSerializer(allowed_msgpack_modules=[Plan, TaskPlan, CoderState])
+    return graph.compile(checkpointer=InMemorySaver(serde=serializer))
+
+
+agent = compile_agent()
 
 if __name__ == "__main__":
     result = asyncio.run(agent.ainvoke(
         {"user_prompt": "Create a simple working calculator website", "browser_preview": True},
-        {"recursion_limit": 100},
+        {"recursion_limit": 100, "configurable": {"thread_id": str(uuid4())}},
     ))
     print(result)
