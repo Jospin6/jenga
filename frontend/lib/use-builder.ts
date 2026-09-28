@@ -28,15 +28,19 @@ function reducer(state: State, action: Action): State {
   if (action.type === "loading") return { ...state, status: "loading", error: null };
   if (action.type === "load") {
     const project = action.project;
-    return { ...initial, recent: state.recent, id: project.id, name: project.name, status: project.status === "generating" ? "cancelled" : project.status,
-      messages: project.history, files: project.files, savedFiles: project.files, plan: project.plan || null };
+    return {
+      ...initial, recent: state.recent, id: project.id, name: project.name, status: project.status === "generating" ? "cancelled" : project.status,
+      messages: project.history, files: project.files, savedFiles: project.files, plan: project.plan || null
+    };
   }
   if (action.type === "begin") return {
     ...state, status: "generating", error: null, completed: [], tasks: [], stage: "planning", activeFile: "",
     activity: "Connexion à votre agent…", messages: [...state.messages, { role: "user", content: action.prompt }],
   };
-  if (action.type === "failure") return { ...state, status: action.cancelled ? "cancelled" : "error", files: state.savedFiles,
-    error: action.cancelled ? null : action.message, activity: action.cancelled ? "Génération arrêtée. Vos fichiers sauvegardés sont conservés." : action.message };
+  if (action.type === "failure") return {
+    ...state, status: action.cancelled ? "cancelled" : "error", files: state.savedFiles,
+    error: action.cancelled ? null : action.message, activity: action.cancelled ? "Génération arrêtée. Vos fichiers sauvegardés sont conservés." : action.message
+  };
 
   const event = action.event;
   switch (event.type) {
@@ -47,8 +51,10 @@ function reducer(state: State, action: Action): State {
     case "file_delta": return { ...state, files: { ...state.files, [event.path]: event.content }, activeFile: event.path };
     case "file": return { ...state, files: { ...state.files, [event.path]: event.content }, savedFiles: { ...state.savedFiles, [event.path]: event.content } };
     case "task_done": return { ...state, completed: [...new Set([...state.completed, event.path])] };
-    case "done": return { ...state, status: "completed", files: event.files, savedFiles: event.files, activeFile: "", activity: "Votre site est prêt.",
-      messages: [...state.messages, { role: "assistant", content: "Votre site est prêt. Explorez l’aperçu ou dites-moi ce que vous souhaitez modifier." }] };
+    case "done": return {
+      ...state, status: "completed", files: event.files, savedFiles: event.files, activeFile: "", activity: "Votre site est prêt.",
+      messages: [...state.messages, { role: "assistant", content: "Votre site est prêt. Explorez l’aperçu ou dites-moi ce que vous souhaitez modifier." }]
+    };
     case "error": return { ...state, status: "error", files: state.savedFiles, error: event.message };
     default: return state;
   }
@@ -117,6 +123,8 @@ export function useBuilder() {
     } finally { controller.current = null; }
   }, []);
 
-  return { state, generate, openProject, stop: () => controller.current?.abort(),
-    newProject: () => { if (!controller.current) dispatch({ type: "reset" }); } };
+  return {
+    state, generate, openProject, stop: () => controller.current?.abort(),
+    newProject: () => { if (!controller.current) dispatch({ type: "reset" }); }
+  };
 }

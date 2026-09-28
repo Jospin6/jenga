@@ -20,9 +20,15 @@ export const PromptBox = forwardRef<HTMLTextAreaElement, Props>(function PromptB
     <textarea ref={ref} id={compact ? "followup-prompt" : "initial-prompt"} value={text} onChange={(event) => update(event.target.value)} maxLength={12000} disabled={busy}
       placeholder={compact ? "Une idée pour la suite ?" : "Un site pour mon idée, avec…"}
       onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); } }} />
-    <div className="prompt-bottom"><span className="prompt-mode"><Icon name="spark" size={14} />{compact ? "Demandez une modification" : "Imaginez. Décrivez. Créez."}</span>
-      {busy ? <button className="submit-prompt stopping" type="button" onClick={onStop} aria-label="Arrêter la génération" title="Arrêter la génération"><Icon name="stop" /></button>
-        : <button className="submit-prompt" type="submit" disabled={text.trim().length < 3} aria-label={compact ? "Envoyer la modification" : "Générer mon site"} title="Envoyer"><Icon name="arrow" size={21} /></button>}
+    <div className="prompt-bottom">
+      <span className="prompt-mode">
+        <Icon name="spark" size={14} />{compact ? "Demandez une modification" : "Imaginez. Décrivez. Créez."}</span>
+      {busy ? <button className="submit-prompt stopping" type="button" onClick={onStop} aria-label="Arrêter la génération" title="Arrêter la génération">
+        <Icon name="stop" />
+      </button>
+        : <button className="submit-prompt" type="submit" disabled={text.trim().length < 3} aria-label={compact ? "Envoyer la modification" : "Générer mon site"} title="Envoyer">
+          <Icon name="arrow" size={21} />
+        </button>}
     </div>
   </form>;
 });
