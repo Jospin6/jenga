@@ -2,11 +2,21 @@
 
 import json
 import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
-PROJECTS_ROOT = Path(__file__).resolve().parents[1] / "generated_projects"
+def configured_projects_root() -> Path:
+    if directory := os.getenv("PROJECTS_DIR"):
+        return Path(directory).expanduser().resolve()
+    if os.getenv("VERCEL") == "1":
+        # The deployment filesystem is read-only; this storage is ephemeral.
+        return Path(tempfile.gettempdir()) / "jenga" / "generated_projects"
+    return Path(__file__).resolve().parents[1] / "generated_projects"
+
+
+PROJECTS_ROOT = configured_projects_root()
 
 
 def project_dir(project_id: str) -> Path:

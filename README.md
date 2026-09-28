@@ -45,6 +45,10 @@ Le proxy Next.js utilise `http://127.0.0.1:8000` par défaut. Pour changer cette
 
 Les fichiers et la conversation sont sauvegardés dans `generated_projects/<uuid>/`. La liste des projets récents est conservée dans le stockage local du navigateur. Les générations précédentes de `generated_project/` ne sont pas modifiées ni importées automatiquement.
 
+Sur Vercel (`VERCEL=1`), le backend utilise automatiquement `/tmp/jenga/generated_projects/`, car le dossier du déploiement est en lecture seule. `PROJECTS_DIR` permet de choisir un autre dossier accessible en écriture via les variables d’environnement du backend ; utiliser un chemin absolu puis redéployer après modification. En local, cette variable peut être placée dans `backend/.env`.
+
+Le stockage `/tmp` est **temporaire et propre à chaque instance** : un projet peut disparaître au redémarrage ou être introuvable si la requête suivante arrive sur une autre instance, y compris pour une modification ou un téléchargement. Ce correctif permet la génération et son aperçu dans la requête en cours. La sauvegarde durable, la réouverture et l’export fiable des projets nécessitent un stockage externe partagé.
+
 ## Périmètre de cette version
 
 Le **frontend de l’outil est en Next.js**. Les **sites générés sont des sites statiques HTML/CSS/JavaScript**, avec `index.html` comme point d’entrée, des scripts classiques et une navigation sur une seule page. Cette contrainte est ajoutée aux prompts de l’agent pour garantir un aperçu immédiat sans installer ou exécuter du code serveur généré.

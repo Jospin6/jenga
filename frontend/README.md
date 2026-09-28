@@ -30,7 +30,7 @@ Le proxy autorise des requêtes jusqu’à 300 secondes, la [limite de l’offre
 
 Après déploiement, ouvrir `/api/health` sur le domaine du frontend : la réponse attendue pour un backend configuré est `{"status":"ok","configured":true}`. Si `configured` vaut `false`, ajouter `OPENAI_API_KEY` aux variables du **projet backend** et redéployer ce dernier. Une redirection vers une connexion Vercel indique que le backend n’est pas accessible au proxy sans authentification.
 
-Le backend actuel sauvegarde les projets dans `generated_projects/` à côté du code. Ce stockage doit être adapté avant une utilisation complète sur Vercel, dont les [fonctions ont un système de fichiers en lecture seule hors `/tmp`](https://vercel.com/docs/functions/runtimes). Un stockage persistant externe est nécessaire pour conserver et retrouver les projets entre instances ; un simple contrôle `/api/health` ne valide pas la génération.
+Le backend utilise `generated_projects/` en local et `/tmp/jenga/generated_projects/` sur Vercel, dont les [fonctions ont un système de fichiers en lecture seule hors `/tmp`](https://vercel.com/docs/functions/runtimes). Le dossier peut être configuré avec `PROJECTS_DIR` dans l’environnement du backend. Sur Vercel, ce stockage est temporaire et propre à chaque instance : la réouverture, les modifications et le téléchargement peuvent échouer après un changement d’instance. Un stockage persistant externe est nécessaire pour conserver et retrouver les projets de façon fiable ; un simple contrôle `/api/health` ne valide pas la génération.
 
 ## Vérifications
 

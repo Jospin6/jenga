@@ -1,4 +1,5 @@
 import asyncio
+import errno
 import io
 import json
 import os
@@ -129,6 +130,19 @@ class BuilderTests(unittest.TestCase):
         self.assertNotIn("private-provider-token", response.text)
         self.assertNotIn('"type": "done"', response.text)
         self.assertFalse(main.active_projects)
+
+    def test_unwritable_storage_returns_clear_error_before_calling_model(self):
+        error = OSError(errno.EROFS, "Read-only file system", "/private/deployment/path")
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test"}), \
+                patch.object(main, "save_project", side_effect=error), \
+                patch.object(main, "get_agent") as get_agent, \
+                self.assertLogs("backend.main", level="ERROR"):
+            response = self.client.post("/api/generate", json={"prompt": "Un site"})
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("stockage", response.json()["detail"])
+        self.assertNotIn("/private/deployment/path", response.text)
+        self.assertFalse(main.active_projects)
+        get_agent.assert_not_called()
 
     def test_disconnect_cancels_agent_and_releases_project(self):
         started = asyncio.Event()

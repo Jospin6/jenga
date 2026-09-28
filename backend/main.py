@@ -12,6 +12,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
+# Load configuration before the project store chooses its directory.
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 if __package__:
     from .projects import load_project, project_dir, read_files, save_project
     from .agent.workspace import project_workspace
@@ -22,7 +25,6 @@ else:
     from agent.workspace import project_workspace
     from streaming import FileDrafts, sse
 
-load_dotenv(Path(__file__).resolve().parent / ".env")
 app = FastAPI(title="Jenga — Website builder", version="1.0.0")
 logger = logging.getLogger(__name__)
 active_projects: set[str] = set()
@@ -101,6 +103,12 @@ async def generate(body: GenerateRequest):
     data["history"].append({"role": "user", "content": body.prompt})
     try:
         save_project(data)
+    except OSError:
+        active_projects.discard(project_id)
+        logger.exception("Could not initialize storage for project %s", project_id)
+        raise HTTPException(
+            503, "Le stockage des projets est indisponible. Réessayez plus tard ou contactez l'administrateur.",
+        ) from None
     except Exception:
         active_projects.discard(project_id)
         raise
