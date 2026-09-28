@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 900;
+export const maxDuration = 300;
 
 async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
@@ -29,7 +29,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
     return new Response(upstream.body, { status: upstream.status, headers });
   } catch {
     return Response.json(
-      { detail: "Le backend est injoignable. Démarrez FastAPI sur le port 8000, puis réessayez." },
+      { detail: "Le service de création est injoignable. Réessayez dans quelques instants." },
       { status: 502 },
     );
   }
